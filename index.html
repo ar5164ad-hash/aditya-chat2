@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#0b141a">
+<link rel="manifest" href="manifest.json">
+<title>Aditya Chat</title>
+<style>
+  :root { --green:#25d366; --dark:#0b141a; --panel:rgba(11,20,26,.82); --line:rgba(255,255,255,.12); --text:#e9edef; --muted:#9fb0b8; }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; font-family:'Segoe UI',system-ui,sans-serif; color:var(--text); }
+  body {
+    background:#0b141a url('background.png') center/cover fixed no-repeat;
+    overflow:hidden;
+  }
+  body::before { content:''; position:fixed; inset:0; background:linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.65)); z-index:0; }
+
+  /* Watermark on every page, along the side */
+  .wm { position:fixed; top:50%; z-index:50; pointer-events:none; font-size:34px; font-weight:800; letter-spacing:10px;
+        color:rgba(255,255,255,.22); text-transform:uppercase; white-space:nowrap; }
+  .wm.left  { left:6px;  transform:translateY(-50%) rotate(-90deg); transform-origin:left top; top:60%; }
+  .wm.right { right:6px; transform:translateY(-50%) rotate(90deg);  transform-origin:right top; top:40%; }
+
+  .view { position:fixed; inset:0; z-index:1; display:none; flex-direction:column; align-items:center; padding:0 34px; }
+  .view.active { display:flex; }
+  .center { justify-content:center; text-align:center; }
+
+  .card { width:100%; max-width:420px; background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:32px 24px; backdrop-filter:blur(10px); }
+  h1 { font-size:44px; margin-bottom:8px; }
+  h2 { font-size:22px; margin-bottom:6px; }
+  p.sub { color:var(--muted); margin-bottom:22px; font-size:14px; }
+  input { width:100%; padding:14px 16px; border-radius:12px; border:1px solid var(--line); background:rgba(255,255,255,.08); color:var(--text); font-size:18px; outline:none; text-align:center; }
+  input:focus { border-color:var(--green); }
+  button.primary { width:100%; margin-top:16px; padding:14px; border:0; border-radius:12px; background:var(--green); color:#04210f; font-size:17px; font-weight:700; cursor:pointer; }
+  button.primary:disabled { opacity:.45; }
+  .err { color:#ff8a8a; min-height:20px; margin-top:12px; font-size:14px; }
+  .ok { color:var(--green); }
+
+  /* Home */
+  .topbar { width:100%; max-width:700px; display:flex; align-items:center; justify-content:space-between; padding:16px 0 8px; }
+  .topbar .me { font-size:13px; color:var(--muted); }
+  .topbar .me b { color:var(--text); font-size:16px; display:block; }
+  .searchbox { width:100%; max-width:700px; position:relative; margin:8px 0 14px; }
+  .searchbox input { text-align:left; padding-left:44px; border-radius:26px; font-size:17px; letter-spacing:1px; }
+  .searchbox::before { content:'🔍'; position:absolute; left:15px; top:50%; transform:translateY(-50%); font-size:16px; }
+  .list { width:100%; max-width:700px; flex:1; overflow-y:auto; padding-bottom:20px; }
+  .row { display:flex; align-items:center; gap:14px; padding:12px 14px; margin-bottom:8px; background:var(--panel); border:1px solid var(--line); border-radius:14px; cursor:pointer; }
+  .row:active { background:rgba(37,211,102,.18); }
+  .avatar { width:46px; height:46px; border-radius:50%; background:linear-gradient(135deg,#25d366,#128c7e); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:19px; color:#04210f; flex-shrink:0; }
+  .row .info { flex:1; min-width:0; }
+  .row .nm { font-weight:600; }
+  .row .sn, .row .last { color:var(--muted); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .empty { text-align:center; color:var(--muted); margin-top:40px; }
+
+  /* Profile / chat */
+  .head { width:100%; max-width:700px; display:flex; align-items:center; gap:12px; padding:14px 0; }
+  .back { background:none; border:0; color:var(--text); font-size:26px; cursor:pointer; }
+  .profile { width:100%; max-width:700px; text-align:center; padding:6px 0 10px; border-bottom:1px solid var(--line); }
+  .profile .avatar { width:76px; height:76px; font-size:32px; margin:0 auto 8px; }
+  .msgs { width:100%; max-width:700px; flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:6px; padding:12px 0; }
+  .bub { max-width:78%; padding:9px 13px; border-radius:14px; font-size:15px; line-height:1.35; word-wrap:break-word; }
+  .bub.me { align-self:flex-end; background:#075e54; border-bottom-right-radius:4px; }
+  .bub.them { align-self:flex-start; background:rgba(32,44,51,.95); border-bottom-left-radius:4px; }
+  .bub small { display:block; text-align:right; font-size:10px; color:var(--muted); margin-top:3px; }
+  .send { width:100%; max-width:700px; display:flex; gap:10px; padding:10px 0 16px; }
+  .send input { text-align:left; border-radius:24px; font-size:16px; }
+  .send button { width:50px; border:0; border-radius:50%; background:var(--green); font-size:20px; cursor:pointer; }
+  .link { background:none; border:0; color:var(--muted); font-size:13px; cursor:pointer; text-decoration:underline; }
+</style>
+</head>
+<body>
+<div class="wm left">Aditya</div>
+<div class="wm right">Aditya</div>
+
+<!-- 1. Welcome -->
+<div class="view center" id="v-welcome">
+  <div class="card">
+    <h1>Welcome 👋</h1>
+    <p class="sub">Pick your own serial number and start chatting.</p>
+    <button class="primary" onclick="show('v-serial')">Get Started</button>
+  </div>
+</div>
+
+<!-- 2. Serial number -->
+<div class="view center" id="v-serial">
+  <div class="card">
+    <h2>Choose your Serial No.</h2>
+    <p class="sub">Up to 5 digits. Once taken, it is reserved for you only.</p>
+    <input id="serial" inputmode="numeric" maxlength="5" placeholder="e.g. 12345" autocomplete="off">
+    <div class="err" id="serialMsg"></div>
+    <button class="primary" id="serialBtn" onclick="checkSerial()">Continue</button>
+  </div>
+</div>
+
+<!-- 3. Username -->
+<div class="view center" id="v-name">
+  <div class="card">
+    <h2>Enter your Name</h2>
+    <p class="sub">Others will see this name next to Serial No. <b id="mySerialShow"></b></p>
+    <input id="uname" maxlength="30" placeholder="Your name" autocomplete="off">
+    <div class="err" id="nameMsg"></div>
+    <button class="primary" onclick="register()">Enter App</button>
+    <button class="link" style="margin-top:12px" onclick="show('v-serial')">← Change serial no.</button>
+  </div>
+</div>
+
+<!-- 4. Home -->
+<div class="view" id="v-home">
+  <div class="topbar">
+    <div class="me"><b id="meName"></b>Serial No. <span id="meSerial"></span></div>
+    <button class="link" onclick="logout()">Log out</button>
+  </div>
+  <div class="searchbox"><input id="search" inputmode="numeric" maxlength="5" placeholder="Dial a serial number…" autocomplete="off"></div>
+  <div class="list" id="homeList"></div>
+</div>
+
+<!-- 5. Profile + chat -->
+<div class="view" id="v-chat">
+  <div class="head"><button class="back" onclick="goHome()">←</button><b>Profile</b></div>
+  <div class="profile">
+    <div class="avatar" id="pAvatar"></div>
+    <h2 id="pName"></h2>
+    <div class="sub" style="margin:0">Serial No. <span id="pSerial"></span></div>
+  </div>
+  <div class="msgs" id="msgs"></div>
+  <div class="send">
+    <input id="msgInput" placeholder="Send a text message…" autocomplete="off">
+    <button onclick="sendMsg()">➤</button>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let token = localStorage.getItem('token'), me = null, peer = null, pollTimer = null, pendingSerial = '';
+
+const api = async (path, opts = {}) => {
+  const r = await fetch('/api' + path, {
+    method: opts.method || 'GET',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Something went wrong');
+  return data;
+};
+function show(id) {
+  document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
+  $(id).classList.add('active');
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const initial = (n) => esc((n || '?').trim()[0].toUpperCase());
+
+$('serial').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, ''); $('serialMsg').textContent = ''; });
+
+async function checkSerial() {
+  const s = $('serial').value;
+  if (!s) { $('serialMsg').textContent = 'Enter a serial number'; return; }
+  try {
+    const r = await api('/check?serial=' + s);
+    if (!r.available) { $('serialMsg').textContent = 'Sorry, this serial no. is already reserved. Try another.'; return; }
+    pendingSerial = s; $('mySerialShow').textContent = s; show('v-name');
+  } catch (e) { $('serialMsg').textContent = e.message; }
+}
+async function register() {
+  const name = $('uname').value.trim();
+  if (!name) { $('nameMsg').textContent = 'Please enter your name'; return; }
+  try {
+    const r = await api('/register', { method: 'POST', body: { serial: pendingSerial, name } });
+    token = r.token; localStorage.setItem('token', token); me = r.user; enterHome();
+  } catch (e) { $('nameMsg').textContent = e.message; }
+}
+function logout() { localStorage.removeItem('token'); token = null; me = null; location.reload(); }
+
+/* Home: search by dialing serial number */
+function enterHome() {
+  $('meName').textContent = me.name; $('meSerial').textContent = me.serial;
+  show('v-home'); $('search').value = ''; loadChats();
+}
+function goHome() { clearInterval(pollTimer); enterHome(); }
+$('search').addEventListener('input', async (e) => {
+  e.target.value = e.target.value.replace(/\D/g, '');
+  const q = e.target.value;
+  if (!q) return loadChats();
+  try {
+    const { results } = await api('/search?q=' + q);
+    $('homeList').innerHTML = results.length
+      ? results.map(userRow).join('')
+      : '<div class="empty">No user found with this serial no.</div>';
+  } catch (err) {}
+});
+const userRow = (u, sub) => `<div class="row" onclick="openChat('${u.serial}')">
+  <div class="avatar">${initial(u.name)}</div>
+  <div class="info"><div class="nm">${esc(u.name)}</div><div class="${sub ? 'last' : 'sn'}">${sub ? esc(sub) : 'Serial No. ' + u.serial}</div></div></div>`;
+async function loadChats() {
+  const { chats } = await api('/chats');
+  $('homeList').innerHTML = chats.length
+    ? chats.map((c) => userRow(c.user, c.last.text)).join('')
+    : '<div class="empty">Dial a serial number in the search bar<br>to find someone and start chatting.</div>';
+}
+
+/* Profile + messages */
+async function openChat(serial) {
+  const { user } = await api('/user/' + serial);
+  peer = user;
+  $('pAvatar').textContent = user.name[0].toUpperCase();
+  $('pName').textContent = user.name; $('pSerial').textContent = user.serial;
+  show('v-chat'); await loadMsgs();
+  clearInterval(pollTimer); pollTimer = setInterval(loadMsgs, 3000);
+}
+async function loadMsgs() {
+  if (!peer) return;
+  const { messages } = await api('/messages?with=' + peer.serial);
+  const box = $('msgs'), atEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  box.innerHTML = messages.map((m) => {
+    const t = new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `<div class="bub ${m.from === me.serial ? 'me' : 'them'}">${esc(m.text)}<small>${t}</small></div>`;
+  }).join('') || '<div class="empty">No messages yet. Say hi 👋</div>';
+  if (atEnd) box.scrollTop = box.scrollHeight;
+}
+async function sendMsg() {
+  const text = $('msgInput').value.trim(); if (!text) return;
+  $('msgInput').value = '';
+  await api('/messages', { method: 'POST', body: { to: peer.serial, text } });
+  await loadMsgs(); $('msgs').scrollTop = $('msgs').scrollHeight;
+}
+$('msgInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMsg(); });
+
+/* Start */
+(async () => {
+  if (token) { try { me = (await api('/me')).user; return enterHome(); } catch (e) { localStorage.removeItem('token'); token = null; } }
+  show('v-welcome');
+})();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
