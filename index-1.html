@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#0b141a">
+<link rel="manifest" href="manifest.json">
+<title>Aditya Chat</title>
+<style>
+  :root { --green:#25d366; --dark:#0b141a; --panel:rgba(11,20,26,.84); --line:rgba(255,255,255,.12); --text:#e9edef; --muted:#9fb0b8; }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; font-family:'Segoe UI',system-ui,sans-serif; color:var(--text); }
+  body { background:#0b141a url('background.png') center/cover fixed no-repeat; overflow:hidden; }
+  body::before { content:''; position:fixed; inset:0; background:linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.65)); z-index:0; }
+
+  .wm { position:fixed; z-index:50; pointer-events:none; font-size:34px; font-weight:800; letter-spacing:10px;
+        color:rgba(255,255,255,.22); text-transform:uppercase; white-space:nowrap; }
+  .wm.left  { left:6px;  transform:rotate(-90deg); transform-origin:left top; top:60%; }
+  .wm.right { right:6px; transform:rotate(90deg);  transform-origin:right top; top:40%; }
+
+  .view { position:fixed; inset:0; z-index:1; display:none; flex-direction:column; align-items:center; padding:0 34px; }
+  .view.active { display:flex; }
+  .center { justify-content:center; text-align:center; }
+
+  .card { width:100%; max-width:420px; background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:32px 24px; backdrop-filter:blur(10px); }
+  h1 { font-size:44px; margin-bottom:8px; }
+  h2 { font-size:22px; margin-bottom:6px; }
+  p.sub { color:var(--muted); margin-bottom:22px; font-size:14px; }
+  input, textarea { width:100%; padding:14px 16px; border-radius:12px; border:1px solid var(--line); background:rgba(255,255,255,.08); color:var(--text); font-size:18px; outline:none; text-align:center; font-family:inherit; }
+  input:focus, textarea:focus { border-color:var(--green); }
+  button.primary { width:100%; margin-top:16px; padding:14px; border:0; border-radius:12px; background:var(--green); color:#04210f; font-size:17px; font-weight:700; cursor:pointer; }
+  button.primary:disabled { opacity:.45; }
+  .err { color:#ff8a8a; min-height:20px; margin-top:12px; font-size:14px; }
+  .link { background:none; border:0; color:var(--muted); font-size:13px; cursor:pointer; text-decoration:underline; }
+
+  /* Home */
+  .topbar { width:100%; max-width:700px; display:flex; align-items:center; justify-content:space-between; padding:14px 0 6px; }
+  .topbar .me { font-size:13px; color:var(--muted); }
+  .topbar .me b { color:var(--text); font-size:16px; display:block; }
+  .searchbox { width:100%; max-width:700px; position:relative; margin:6px 0 10px; }
+  .searchbox input { text-align:left; padding-left:44px; border-radius:26px; font-size:17px; letter-spacing:1px; }
+  .searchbox::before { content:'🔍'; position:absolute; left:15px; top:50%; transform:translateY(-50%); font-size:16px; }
+  .list { width:100%; max-width:700px; flex:1; overflow-y:auto; padding-bottom:12px; }
+  .sec { color:var(--green); font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; margin:10px 2px 8px; }
+  .row { display:flex; align-items:center; gap:14px; padding:11px 14px; margin-bottom:8px; background:var(--panel); border:1px solid var(--line); border-radius:14px; cursor:pointer; }
+  .row:active { background:rgba(37,211,102,.18); }
+  .avwrap { position:relative; flex-shrink:0; }
+  .avatar { width:46px; height:46px; border-radius:50%; background:linear-gradient(135deg,#25d366,#128c7e); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:19px; color:#04210f; }
+  .avatar.ring { box-shadow:0 0 0 3px var(--dark), 0 0 0 5px var(--green); }
+  .avatar.group { background:linear-gradient(135deg,#34b7f1,#0b6fa4); color:#fff; font-size:22px; }
+  .dot { position:absolute; right:0; bottom:0; width:13px; height:13px; border-radius:50%; background:var(--green); border:2px solid var(--dark); }
+  .plus { position:absolute; right:-4px; bottom:-4px; width:20px; height:20px; border-radius:50%; background:var(--green); color:#04210f; font-weight:800; font-size:15px; display:flex; align-items:center; justify-content:center; border:2px solid var(--dark); }
+  .row .info { flex:1; min-width:0; }
+  .row .nm { font-weight:600; }
+  .row .sn, .row .last { color:var(--muted); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .on { color:var(--green); font-weight:600; }
+  .empty { text-align:center; color:var(--muted); margin:30px 0; font-size:14px; }
+  .tabs { width:100%; max-width:700px; display:flex; gap:8px; padding:8px 0 14px; }
+  .tabs button { flex:1; padding:11px 4px; border:1px solid var(--line); border-radius:14px; background:var(--panel); color:var(--muted); font-size:14px; font-weight:600; cursor:pointer; }
+  .tabs button.on { background:var(--green); color:#04210f; border-color:var(--green); }
+  .fab { position:fixed; right:52px; bottom:84px; z-index:20; width:56px; height:56px; border-radius:50%; border:0; background:var(--green); color:#04210f; font-size:26px; font-weight:700; box-shadow:0 4px 14px rgba(0,0,0,.5); cursor:pointer; display:none; }
+
+  /* Chat */
+  .head { width:100%; max-width:700px; display:flex; align-items:center; gap:12px; padding:12px 0; }
+  .head .ttl { flex:1; min-width:0; }
+  .head .ttl b { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .head .ttl small { color:var(--muted); font-size:12px; }
+  .back { background:none; border:0; color:var(--text); font-size:26px; cursor:pointer; }
+  .profile { width:100%; max-width:700px; text-align:center; padding:4px 0 8px; border-bottom:1px solid var(--line); }
+  .profile .avatar { width:70px; height:70px; font-size:30px; margin:0 auto 6px; }
+  .lock { width:100%; max-width:700px; text-align:center; font-size:12px; color:#f7d98b; background:rgba(255,214,102,.08); border:1px solid rgba(255,214,102,.25); border-radius:10px; padding:7px 10px; margin:8px 0 2px; cursor:pointer; }
+  .msgs { width:100%; max-width:700px; flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:6px; padding:10px 0; }
+  .bub { max-width:78%; padding:8px 12px; border-radius:14px; font-size:15px; line-height:1.35; word-wrap:break-word; white-space:pre-wrap; }
+  .bub.me { align-self:flex-end; background:#075e54; border-bottom-right-radius:4px; }
+  .bub.them { align-self:flex-start; background:rgba(32,44,51,.95); border-bottom-left-radius:4px; }
+  .bub .who { display:block; font-size:12px; font-weight:700; color:#53bdeb; margin-bottom:2px; }
+  .bub small { display:block; text-align:right; font-size:10px; color:var(--muted); margin-top:3px; }
+  .send { width:100%; max-width:700px; display:flex; gap:10px; padding:10px 0 16px; }
+  .send input { text-align:left; border-radius:24px; font-size:16px; }
+  .send button { width:50px; flex-shrink:0; border:0; border-radius:50%; background:var(--green); font-size:20px; cursor:pointer; }
+  .panel { width:100%; max-width:700px; max-height:42vh; overflow-y:auto; background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:10px; margin-bottom:6px; display:none; }
+  .panel.open { display:block; }
+  .mrow { display:flex; align-items:center; gap:10px; padding:6px 2px; font-size:14px; }
+  .mrow .grow { flex:1; min-width:0; }
+  .mrow small { color:var(--muted); }
+  .mini { border:1px solid var(--green); background:none; color:var(--green); border-radius:10px; padding:5px 12px; font-weight:700; cursor:pointer; }
+  .danger { width:100%; margin-top:10px; padding:11px; border-radius:12px; border:1px solid #ff6b6b; background:none; color:#ff8a8a; font-weight:700; cursor:pointer; }
+  .chk { width:24px; height:24px; border-radius:7px; border:2px solid var(--muted); display:flex; align-items:center; justify-content:center; font-weight:800; color:#04210f; flex-shrink:0; }
+  .chk.on { background:var(--green); border-color:var(--green); }
+
+  /* Status */
+  .sbox { width:100%; max-width:420px; flex:1; max-height:62vh; margin:6px 0; border-radius:18px; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; background:#075e54; }
+  .sbox img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#000; }
+  .sbox textarea { position:relative; background:transparent; border:0; text-align:center; font-size:26px; font-weight:600; color:#fff; resize:none; height:100%; padding:22px; }
+  .sbox.hasimg textarea { height:auto; position:absolute; left:0; right:0; bottom:0; font-size:18px; background:rgba(0,0,0,.55); border-radius:0; }
+  .swatches { display:flex; gap:10px; margin:8px 0; flex-wrap:wrap; justify-content:center; }
+  .sw { width:32px; height:32px; border-radius:50%; border:3px solid transparent; cursor:pointer; }
+  .sw.on { border-color:#fff; }
+  .rowbtns { width:100%; max-width:420px; display:flex; gap:10px; }
+  .rowbtns button { flex:1; }
+  .ghost { margin-top:16px; padding:14px; border-radius:12px; border:1px solid var(--line); background:var(--panel); color:var(--text); font-size:16px; font-weight:600; cursor:pointer; }
+  .story { width:100%; max-width:420px; flex:1; max-height:82vh; margin:10px 0; border-radius:18px; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; text-align:center; }
+  .story img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#000; }
+  .story .txt { position:relative; padding:26px; font-size:26px; font-weight:600; color:#fff; white-space:pre-wrap; word-wrap:break-word; }
+  .story .cap { position:absolute; left:0; right:0; bottom:0; padding:14px; background:rgba(0,0,0,.6); font-size:17px; color:#fff; white-space:pre-wrap; }
+  .story .bars { position:absolute; top:8px; left:8px; right:8px; display:flex; gap:4px; z-index:3; }
+  .story .bars i { flex:1; height:3px; border-radius:2px; background:rgba(255,255,255,.35); overflow:hidden; }
+  .story .bars i b { display:block; height:100%; width:0; background:#fff; }
+  .story .bars i.done b { width:100%; }
+  .story .bars i.cur b { animation:fill 5s linear forwards; }
+  @keyframes fill { to { width:100%; } }
+  .story .top { position:absolute; top:18px; left:10px; right:10px; z-index:3; display:flex; align-items:center; gap:10px; color:#fff; text-shadow:0 1px 3px #000; }
+  .story .top .grow { flex:1; }
+  .story .top button { background:rgba(0,0,0,.45); border:0; color:#fff; font-size:18px; border-radius:50%; width:34px; height:34px; cursor:pointer; }
+  .story .zl, .story .zr { position:absolute; top:60px; bottom:0; width:50%; z-index:2; }
+  .story .zl { left:0; } .story .zr { right:0; }
+  #toast { position:fixed; left:50%; bottom:90px; transform:translateX(-50%); z-index:99; background:#222c32; border:1px solid var(--line); padding:10px 16px; border-radius:20px; font-size:14px; display:none; max-width:80%; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wm left">Aditya</div>
+<div class="wm right">Aditya</div>
+<div id="toast"></div>
+
+<!-- 1. Welcome -->
+<div class="view center" id="v-welcome">
+  <div class="card">
+    <h1>Welcome 👋</h1>
+    <p class="sub">Pick your own serial number and start chatting.<br>🔒 Chats are end-to-end encrypted.</p>
+    <button class="primary" onclick="show('v-serial')">Get Started</button>
+  </div>
+</div>
+
+<!-- 2. Serial -->
+<div class="view center" id="v-serial">
+  <div class="card">
+    <h2>Choose your Serial No.</h2>
+    <p class="sub">Up to 5 digits. Once taken, it is reserved for you only.</p>
+    <input id="serial" inputmode="numeric" maxlength="5" placeholder="e.g. 12345" autocomplete="off">
+    <div class="err" id="serialMsg"></div>
+    <button class="primary" onclick="checkSerial()">Continue</button>
+  </div>
+</div>
+
+<!-- 3. Name -->
+<div class="view center" id="v-name">
+  <div class="card">
+    <h2>Enter your Name</h2>
+    <p class="sub">Others will see this name next to Serial No. <b id="mySerialShow"></b></p>
+    <input id="uname" maxlength="30" placeholder="Your name" autocomplete="off">
+    <div class="err" id="nameMsg"></div>
+    <button class="primary" id="regBtn" onclick="register()">Enter App</button>
+    <button class="link" style="margin-top:12px" onclick="show('v-serial')">← Change serial no.</button>
+  </div>
+</div>
+
+<!-- 4. Home -->
+<div class="view" id="v-home">
+  <div class="topbar">
+    <div class="me"><b id="meName"></b>Serial No. <span id="meSerial"></span></div>
+    <button class="link" onclick="logout()">Log out</button>
+  </div>
+  <div class="searchbox" id="searchWrap"><input id="search" inputmode="numeric" maxlength="5" placeholder="Dial a serial number…" autocomplete="off"></div>
+  <div class="list" id="homeList"></div>
+  <div class="tabs">
+    <button id="t-chats" class="on" onclick="setTab('chats')">💬 Chats</button>
+    <button id="t-status" onclick="setTab('status')">⭕ Status</button>
+    <button id="t-groups" onclick="setTab('groups')">👥 Groups</button>
+  </div>
+</div>
+<button class="fab" id="fab" onclick="fabClick()">＋</button>
+
+<!-- 5. Profile + chat -->
+<div class="view" id="v-chat">
+  <div class="head"><button class="back" onclick="goHome()">←</button><b>Profile</b></div>
+  <div class="profile">
+    <div class="avatar" id="pAvatar"></div>
+    <h2 id="pName"></h2>
+    <div class="sub" style="margin:0">Serial No. <span id="pSerial"></span> <span id="pOnline"></span></div>
+  </div>
+  <div class="lock" id="lockBanner" onclick="showSafety()">🔒 Messages are end-to-end encrypted. Tap to verify.</div>
+  <div class="msgs" id="msgs"></div>
+  <div class="send">
+    <input id="msgInput" placeholder="Send an encrypted message…" autocomplete="off">
+    <button onclick="sendMsg()">➤</button>
+  </div>
+</div>
+
+<!-- 6. Status composer -->
+<div class="view" id="v-compose">
+  <div class="head"><button class="back" onclick="goHome()">←</button><b>New status</b></div>
+  <div class="sbox" id="sbox"><img id="simg" style="display:none"><textarea id="stext" maxlength="300" placeholder="Type a status…"></textarea></div>
+  <div class="swatches" id="swatches"></div>
+  <div class="rowbtns">
+    <button class="ghost" onclick="$('sfile').click()">📷 Add photo</button>
+    <button class="ghost" id="rmPhoto" style="display:none" onclick="removePhoto()">✖ Remove</button>
+  </div>
+  <input type="file" id="sfile" accept="image/*" style="display:none">
+  <div class="rowbtns"><button class="primary" id="postBtn" onclick="postStatus()">Post status (24 hours)</button></div>
+  <div class="sub" style="margin-top:8px;font-size:12px">Statuses are visible to everyone on Aditya Chat.</div>
+</div>
+
+<!-- 7. Status viewer -->
+<div class="view" id="v-story"><div class="story" id="storyBox"></div></div>
+
+<!-- 8. New group -->
+<div class="view" id="v-gnew">
+  <div class="head"><button class="back" onclick="goHome()">←</button><b>New group</b></div>
+  <input id="gname" maxlength="40" placeholder="Group name" autocomplete="off" style="max-width:700px">
+  <div class="sec" style="width:100%;max-width:700px">Select members (<span id="gcount">0</span>)</div>
+  <div class="list" id="gUsers"></div>
+  <button class="primary" style="max-width:700px;margin-bottom:16px" id="gcreate" onclick="createGroup()">Create group</button>
+</div>
+
+<!-- 9. Group chat -->
+<div class="view" id="v-group">
+  <div class="head">
+    <button class="back" onclick="goHome()">←</button>
+    <div class="avatar group" style="width:40px;height:40px;font-size:18px">👥</div>
+    <div class="ttl" style="cursor:pointer" onclick="togglePanel()"><b id="gTitle"></b><small id="gSub">tap for members</small></div>
+  </div>
+  <div class="panel" id="gPanel"></div>
+  <div class="lock">🔒 Group messages are end-to-end encrypted.</div>
+  <div class="msgs" id="gmsgs"></div>
+  <div class="send">
+    <input id="gInput" placeholder="Message the group…" autocomplete="off">
+    <button onclick="sendG()">➤</button>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const enc = new TextEncoder(), dec = new TextDecoder();
+let token = localStorage.getItem('token'), me = null, myPriv = null, myPub = null;
+let tab = 'chats', peer = null, grp = null, grpKey = null, pollTimer = null, pendingSerial = '';
+let statusData = [], sv = null, svTimer = null, composeBg = '#075e54', composeImg = null, picked = new Set();
+const userCache = new Map(), pairCache = new Map(), gkCache = new Map(), msgCache = new Map();
+
+/* ---------- helpers ---------- */
+const api = async (path, opts = {}) => {
+  const r = await fetch('/api' + path, {
+    method: opts.method || 'GET',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Something went wrong');
+  return data;
+};
+function show(id) {
+  document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
+  $(id).classList.add('active');
+  $('fab').style.display = (id === 'v-home' && (tab === 'status' || tab === 'groups')) ? 'block' : 'none';
+}
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const initial = (n) => esc((n || '?').trim()[0].toUpperCase());
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._t); t._t = setTimeout(() => t.style.display = 'none', 3200); }
+function ago(ts) {
+  const m = Math.floor((Date.now() - ts) / 60000);
+  if (m < 1) return 'just now'; if (m < 60) return m + ' min ago';
+  const h = Math.floor(m / 60); return h < 24 ? h + ' h ago' : 'yesterday';
+}
+const toB64 = (buf) => { const a = new Uint8Array(buf); let s = ''; for (let i = 0; i < a.length; i++) s += String.fromCharCode(a[i]); return btoa(s); };
+const fromB64 = (s) => { const b = atob(s), a = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; };
+
+/* ---------- end-to-end encryption (Web Crypto) ---------- */
+const ECDH = { name: 'ECDH', namedCurve: 'P-256' };
+const cleanJwk = (j) => ({ kty: j.kty, crv: j.crv, x: j.x, y: j.y, ...(j.d ? { d: j.d } : {}) });
+
+async function loadMyKeys() {
+  const p = localStorage.getItem('privJwk'), q = localStorage.getItem('pubJwk');
+  if (!p || !q) return false;
+  myPriv = await crypto.subtle.importKey('jwk', cleanJwk(JSON.parse(p)), ECDH, false, ['deriveBits']);
+  myPub = JSON.parse(q); return true;
+}
+async function pairKey(peerPub) {
+  const id = peerPub.x + peerPub.y;
+  if (pairCache.has(id)) return pairCache.get(id);
+  const pk = await crypto.subtle.importKey('jwk', cleanJwk(peerPub), ECDH, false, []);
+  const bits = await crypto.subtle.deriveBits({ name: 'ECDH', public: pk }, myPriv, 256);
+  const hk = await crypto.subtle.importKey('raw', bits, 'HKDF', false, ['deriveKey']);
+  const k = await crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32), info: enc.encode('aditya-chat-v1') },
+    hk, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  pairCache.set(id, k); return k;
+}
+async function aesEnc(key, bytes) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, bytes);
+  return { iv: toB64(iv), ct: toB64(ct) };
+}
+async function aesDec(key, iv, ct) {
+  return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64(iv) }, key, fromB64(ct)));
+}
+async function getUser(serial, fresh) {
+  if (!fresh && userCache.has(serial)) return userCache.get(serial);
+  const { user } = await api('/user/' + serial);
+  userCache.set(serial, user); return user;
+}
+async function decDirect(u, m) {
+  if (msgCache.has(m.iv)) return msgCache.get(m.iv);
+  try { const t = dec.decode(await aesDec(await pairKey(u.pub), m.iv, m.ct)); msgCache.set(m.iv, t); return t; }
+  catch (e) { return '🔒 Could not decrypt this message'; }
+}
+async function newGroupKey() { return crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']); }
+async function wrapKeyFor(gk, memberPub) {
+  const raw = await crypto.subtle.exportKey('raw', gk);
+  const w = await aesEnc(await pairKey(memberPub), new Uint8Array(raw));
+  return { by: me.serial, iv: w.iv, ct: w.ct };
+}
+async function unwrapKey(gid, entry) {
+  if (gkCache.has(gid)) return gkCache.get(gid);
+  const by = await getUser(entry.by);
+  const raw = await aesDec(await pairKey(by.pub), entry.iv, entry.ct);
+  const gk = await crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']);
+  gkCache.set(gid, gk); return gk;
+}
+async function decGroup(gk, m) {
+  if (msgCache.has(m.iv)) return msgCache.get(m.iv);
+  try { const t = dec.decode(await aesDec(gk, m.iv, m.ct)); msgCache.set(m.iv, t); return t; }
+  catch (e) { return '🔒 Could not decrypt this message'; }
+}
+async function safetyNumber(a, b) {
+  const parts = [a.x + a.y, b.x + b.y].sort().join('|');
+  const h = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(parts)));
+  let d = ''; for (let i = 0; i < 30; i++) d += h[i] % 10;
+  return d.match(/.{5}/g).join(' ');
+}
+async function showSafety() {
+  if (!peer) return;
+  const n = await safetyNumber(myPub, peer.pub);
+  alert('Safety number for you and ' + peer.name + ':\n\n' + n +
+    '\n\nAsk ' + peer.name + ' to open this same screen. If the numbers match exactly, nobody (not even the server) is intercepting your chat.');
+}
+
+/* ---------- sign up ---------- */
+$('serial').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, ''); $('serialMsg').textContent = ''; });
+async function checkSerial() {
+  const s = $('serial').value;
+  if (!s) { $('serialMsg').textContent = 'Enter a serial number'; return; }
+  try {
+    const r = await api('/check?serial=' + s);
+    if (!r.available) { $('serialMsg').textContent = 'Sorry, this serial no. is already reserved. Try another.'; return; }
+    pendingSerial = s; $('mySerialShow').textContent = s; show('v-name');
+  } catch (e) { $('serialMsg').textContent = e.message; }
+}
+async function register() {
+  const name = $('uname').value.trim();
+  if (!name) { $('nameMsg').textContent = 'Please enter your name'; return; }
+  if (!window.crypto || !crypto.subtle) { $('nameMsg').textContent = 'Please open the app using its https:// link.'; return; }
+  $('regBtn').disabled = true;
+  try {
+    const kp = await crypto.subtle.generateKey(ECDH, true, ['deriveBits']);
+    const pubJ = cleanJwk(await crypto.subtle.exportKey('jwk', kp.publicKey));
+    const privJ = cleanJwk(await crypto.subtle.exportKey('jwk', kp.privateKey));
+    const r = await api('/register', { method: 'POST', body: { serial: pendingSerial, name, pub: pubJ } });
+    token = r.token; me = r.user;
+    localStorage.setItem('token', token);
+    localStorage.setItem('privJwk', JSON.stringify(privJ));
+    localStorage.setItem('pubJwk', JSON.stringify(pubJ));
+    await loadMyKeys(); enterHome();
+  } catch (e) { $('nameMsg').textContent = e.message; }
+  $('regBtn').disabled = false;
+}
+function logout() {
+  if (!confirm('Log out?\n\nYour encryption keys live only on this phone. If you log out you permanently lose this account and all its messages.')) return;
+  localStorage.clear(); location.reload();
+}
+
+/* ---------- home ---------- */
+function enterHome() {
+  $('meName').textContent = me.name; $('meSerial').textContent = me.serial;
+  clearInterval(pollTimer); peer = null; grp = null;
+  show('v-home'); setTab(tab);
+}
+function goHome() { enterHome(); }
+function setTab(t) {
+  tab = t;
+  ['chats', 'status', 'groups'].forEach((x) => $('t-' + x).classList.toggle('on', x === t));
+  $('searchWrap').style.display = t === 'chats' ? 'block' : 'none';
+  $('fab').style.display = (t === 'status' || t === 'groups') && $('v-home').classList.contains('active') ? 'block' : 'none';
+  $('fab').textContent = t === 'status' ? '✎' : '＋';
+  $('search').value = ''; refreshHome();
+}
+function fabClick() { tab === 'status' ? openCompose() : openNewGroup(); }
+async function refreshHome() {
+  try {
+    if (tab === 'chats') await renderChats();
+    else if (tab === 'status') await renderStatusTab();
+    else await renderGroupsTab();
+  } catch (e) { if (/Not logged in/.test(e.message)) { localStorage.clear(); location.reload(); } }
+}
+setInterval(() => { if ($('v-home').classList.contains('active') && !$('search').value) refreshHome(); }, 8000);
+
+const userRow = (u, sub) => `<div class="row" onclick="openChat('${u.serial}')">
+  <div class="avwrap"><div class="avatar">${initial(u.name)}</div>${u.online ? '<i class="dot"></i>' : ''}</div>
+  <div class="info"><div class="nm">${esc(u.name)}</div>
+  <div class="${sub ? 'last' : 'sn'}">${sub ? esc(sub) : 'Serial No. ' + u.serial + (u.online ? ' · <span class="on">Online</span>' : '')}</div></div></div>`;
+
+async function renderChats() {
+  const [{ chats }, { users, total }] = await Promise.all([api('/chats'), api('/users')]);
+  if ($('search').value) return;
+  let html = '';
+  if (chats.length) {
+    const rows = await Promise.all(chats.map(async (c) => {
+      userCache.set(c.user.serial, c.user);
+      const txt = await decDirect(c.user, c.last);
+      return userRow(c.user, (c.last.from === me.serial ? 'You: ' : '') + txt);
+    }));
+    html += '<div class="sec">Your chats</div>' + rows.join('');
+  }
+  html += `<div class="sec">People on Aditya Chat · ${total} registered</div>`;
+  html += users.length ? users.map((u) => userRow(u)).join('')
+    : '<div class="empty">You are the first one here!<br>Share the app link so others can join.</div>';
+  $('homeList').innerHTML = html;
+}
+$('search').addEventListener('input', async (e) => {
+  e.target.value = e.target.value.replace(/\D/g, '');
+  const q = e.target.value;
+  if (!q) return refreshHome();
+  try {
+    const { results } = await api('/search?q=' + q);
+    $('homeList').innerHTML = results.length ? results.map((u) => userRow(u)).join('')
+      : '<div class="empty">No user found with this serial no.</div>';
+  } catch (err) {}
+});
+
+/* ---------- 1:1 chat ---------- */
+async function openChat(serial) {
+  try {
+    peer = await getUser(serial, true);
+    $('pAvatar').textContent = peer.name[0].toUpperCase();
+    $('pName').textContent = peer.name; $('pSerial').textContent = peer.serial;
+    $('pOnline').innerHTML = peer.online ? '· <span class="on">Online</span>' : '';
+    show('v-chat'); await loadMsgs();
+    clearInterval(pollTimer); pollTimer = setInterval(loadMsgs, 3000);
+  } catch (e) { toast(e.message); }
+}
+async function loadMsgs() {
+  if (!peer) return;
+  const { messages } = await api('/messages?with=' + peer.serial);
+  const texts = await Promise.all(messages.map((m) => decDirect(peer, m)));
+  const box = $('msgs'), atEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  box.innerHTML = messages.map((m, i) => {
+    const t = new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `<div class="bub ${m.from === me.serial ? 'me' : 'them'}">${esc(texts[i])}<small>${t}</small></div>`;
+  }).join('') || '<div class="empty">No messages yet. Say hi 👋</div>';
+  if (atEnd) box.scrollTop = box.scrollHeight;
+}
+async function sendMsg() {
+  const text = $('msgInput').value.trim(); if (!text || !peer) return;
+  $('msgInput').value = '';
+  try {
+    const e = await aesEnc(await pairKey(peer.pub), enc.encode(text));
+    await api('/messages', { method: 'POST', body: { to: peer.serial, iv: e.iv, ct: e.ct } });
+    await loadMsgs(); $('msgs').scrollTop = $('msgs').scrollHeight;
+  } catch (err) { toast(err.message); }
+}
+$('msgInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMsg(); });
+
+/* ---------- status ---------- */
+async function renderStatusTab() {
+  const { statuses } = await api('/status');
+  statusData = statuses;
+  const mine = statuses.find((s) => s.user.serial === me.serial);
+  const others = statuses.filter((s) => s.user.serial !== me.serial);
+  const last = (s) => Math.max(...s.items.map((i) => i.time));
+  let html = `<div class="row" onclick="${mine ? `openStory('${me.serial}')` : 'openCompose()'}">
+    <div class="avwrap"><div class="avatar ${mine ? 'ring' : ''}">${initial(me.name)}</div>${mine ? '' : '<span class="plus">+</span>'}</div>
+    <div class="info"><div class="nm">My status</div><div class="sn">${mine ? mine.items.length + ' update(s) · ' + ago(last(mine)) : 'Tap to add a status update'}</div></div></div>`;
+  html += '<div class="sec">Recent updates</div>';
+  html += others.length ? others.map((s) => `<div class="row" onclick="openStory('${s.user.serial}')">
+    <div class="avwrap"><div class="avatar ring">${initial(s.user.name)}</div></div>
+    <div class="info"><div class="nm">${esc(s.user.name)}</div><div class="sn">${ago(last(s))}</div></div></div>`).join('')
+    : '<div class="empty">No status updates from others yet.</div>';
+  $('homeList').innerHTML = html;
+}
+const COLORS = ['#075e54', '#1f6feb', '#8e44ad', '#c0392b', '#d35400', '#2c3e50', '#16a085'];
+function openCompose() {
+  composeImg = null; composeBg = COLORS[0]; $('stext').value = '';
+  $('swatches').innerHTML = COLORS.map((c) => `<div class="sw" style="background:${c}" onclick="pickColor('${c}')"></div>`).join('');
+  pickColor(composeBg); applyImg(); show('v-compose');
+}
+function pickColor(c) {
+  composeBg = c; $('sbox').style.background = c;
+  [...$('swatches').children].forEach((el, i) => el.classList.toggle('on', COLORS[i] === c));
+}
+function applyImg() {
+  $('simg').style.display = composeImg ? 'block' : 'none';
+  if (composeImg) $('simg').src = composeImg;
+  $('sbox').classList.toggle('hasimg', !!composeImg);
+  $('stext').placeholder = composeImg ? 'Add a caption…' : 'Type a status…';
+  $('rmPhoto').style.display = composeImg ? 'block' : 'none';
+}
+function removePhoto() { composeImg = null; $('sfile').value = ''; applyImg(); }
+function fileToDataUrl(file, max = 640) {
+  return new Promise((res, rej) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const s = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', 0.7));
+    };
+    img.onerror = rej; img.src = url;
+  });
+}
+$('sfile').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  try { composeImg = await fileToDataUrl(f); applyImg(); } catch (err) { toast('Could not read that photo'); }
+});
+async function postStatus() {
+  const text = $('stext').value.trim();
+  if (!text && !composeImg) return toast('Write something or add a photo');
+  $('postBtn').disabled = true;
+  try {
+    await api('/status', { method: 'POST', body: { text, bg: composeBg, image: composeImg } });
+    tab = 'status'; enterHome(); toast('Status posted ✔');
+  } catch (e) { toast(e.message); }
+  $('postBtn').disabled = false;
+}
+function openStory(serial) {
+  const s = statusData.find((x) => x.user.serial === serial); if (!s) return;
+  sv = { user: s.user, items: s.items.slice().sort((a, b) => a.time - b.time), idx: 0, own: serial === me.serial };
+  show('v-story'); renderStory();
+}
+function renderStory() {
+  clearTimeout(svTimer);
+  const it = sv.items[sv.idx];
+  const bars = sv.items.map((_, i) => `<i class="${i < sv.idx ? 'done' : i === sv.idx ? 'cur' : ''}"><b></b></i>`).join('');
+  $('storyBox').style.background = it.bg;
+  $('storyBox').innerHTML = `<div class="bars">${bars}</div>
+    <div class="top"><div class="avatar" style="width:34px;height:34px;font-size:15px">${initial(sv.user.name)}</div>
+      <div class="grow"><b>${esc(sv.user.name)}</b> <small>${ago(it.time)}</small></div>
+      ${sv.own ? '<button onclick="delStory(event)">🗑</button>' : ''}<button onclick="closeStory(event)">✕</button></div>
+    ${it.image ? `<img src="${esc(it.image)}">` : ''}
+    ${it.image ? (it.text ? `<div class="cap">${esc(it.text)}</div>` : '') : `<div class="txt">${esc(it.text)}</div>`}
+    <div class="zl" onclick="stepStory(-1)"></div><div class="zr" onclick="stepStory(1)"></div>`;
+  svTimer = setTimeout(() => stepStory(1), 5000);
+}
+function stepStory(d) {
+  sv.idx += d;
+  if (sv.idx < 0) sv.idx = 0;
+  if (sv.idx >= sv.items.length) return closeStory();
+  renderStory();
+}
+function closeStory(e) { if (e) e.stopPropagation(); clearTimeout(svTimer); tab = 'status'; enterHome(); }
+async function delStory(e) {
+  e.stopPropagation();
+  if (!confirm('Delete this status?')) return;
+  clearTimeout(svTimer);
+  try {
+    await api('/status/delete', { method: 'POST', body: { id: sv.items[sv.idx].id } });
+    sv.items.splice(sv.idx, 1);
+    if (!sv.items.length) return closeStory();
+    if (sv.idx >= sv.items.length) sv.idx = sv.items.length - 1;
+    renderStory();
+  } catch (err) { toast(err.message); }
+}
+
+/* ---------- groups ---------- */
+async function renderGroupsTab() {
+  const { groups } = await api('/groups');
+  if (!groups.length) { $('homeList').innerHTML = '<div class="empty">No groups yet.<br>Tap ＋ to create a group with many people.</div>'; return; }
+  const rows = await Promise.all(groups.map(async (g) => {
+    let sub = g.count + ' members';
+    try {
+      if (g.last) { const gk = await unwrapKey(g.id, g.myKey); const u = g.last.from === me.serial ? 'You' : (await getUser(g.last.from)).name; sub = u + ': ' + await decGroup(gk, g.last); }
+    } catch (e) {}
+    return `<div class="row" onclick="openGroup('${g.id}')"><div class="avwrap"><div class="avatar group">👥</div></div>
+      <div class="info"><div class="nm">${esc(g.name)}</div><div class="last">${esc(sub)}</div></div></div>`;
+  }));
+  $('homeList').innerHTML = rows.join('');
+}
+async function openNewGroup() {
+  picked = new Set(); $('gname').value = ''; $('gcount').textContent = '0';
+  show('v-gnew');
+  const { users } = await api('/users');
+  $('gUsers').innerHTML = users.length ? users.map((u) => `<div class="row" onclick="togglePick('${u.serial}', this)">
+    <div class="avwrap"><div class="avatar">${initial(u.name)}</div>${u.online ? '<i class="dot"></i>' : ''}</div>
+    <div class="info"><div class="nm">${esc(u.name)}</div><div class="sn">Serial No. ${u.serial}</div></div><div class="chk"></div></div>`).join('')
+    : '<div class="empty">No other users registered yet.</div>';
+}
+function togglePick(serial, el) {
+  if (picked.has(serial)) picked.delete(serial); else picked.add(serial);
+  const c = el.querySelector('.chk'); c.classList.toggle('on', picked.has(serial)); c.textContent = picked.has(serial) ? '✓' : '';
+  $('gcount').textContent = picked.size;
+}
+async function createGroup() {
+  const name = $('gname').value.trim();
+  if (!name) return toast('Enter a group name');
+  if (!picked.size) return toast('Select at least one member');
+  $('gcreate').disabled = true;
+  try {
+    const members = [me.serial, ...picked];
+    const gk = await newGroupKey();
+    const keys = {};
+    for (const s of members) { const u = s === me.serial ? { pub: myPub } : await getUser(s, true); keys[s] = await wrapKeyFor(gk, u.pub); }
+    const { id } = await api('/groups', { method: 'POST', body: { name, members, keys } });
+    gkCache.set(id, gk);
+    await openGroup(id);
+  } catch (e) { toast(e.message); }
+  $('gcreate').disabled = false;
+}
+async function openGroup(id) {
+  try {
+    grp = await api('/groups/' + id);
+    grpKey = await unwrapKey(id, grp.myKey);
+    $('gTitle').textContent = grp.name; $('gSub').textContent = grp.members.length + ' members · tap for details';
+    $('gPanel').classList.remove('open');
+    show('v-group'); await loadG();
+    clearInterval(pollTimer); pollTimer = setInterval(loadG, 3000);
+  } catch (e) { toast(e.message); }
+}
+async function loadG() {
+  if (!grp) return;
+  const { messages } = await api('/groups/' + grp.id + '/messages');
+  const texts = await Promise.all(messages.map((m) => decGroup(grpKey, m)));
+  const box = $('gmsgs'), atEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  box.innerHTML = messages.map((m, i) => {
+    const mine = m.from === me.serial;
+    const t = new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `<div class="bub ${mine ? 'me' : 'them'}">${mine ? '' : `<span class="who">${esc(m.name)}</span>`}${esc(texts[i])}<small>${t}</small></div>`;
+  }).join('') || '<div class="empty">No messages yet. Say hi to the group 👋</div>';
+  if (atEnd) box.scrollTop = box.scrollHeight;
+}
+async function sendG() {
+  const text = $('gInput').value.trim(); if (!text || !grp) return;
+  $('gInput').value = '';
+  try {
+    const e = await aesEnc(grpKey, enc.encode(text));
+    await api('/groups/' + grp.id + '/messages', { method: 'POST', body: e });
+    await loadG(); $('gmsgs').scrollTop = $('gmsgs').scrollHeight;
+  } catch (err) { toast(err.message); }
+}
+$('gInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendG(); });
+async function togglePanel() {
+  const p = $('gPanel');
+  if (p.classList.contains('open')) return p.classList.remove('open');
+  await renderPanel(); p.classList.add('open');
+}
+async function renderPanel() {
+  grp = await api('/groups/' + grp.id);
+  const { users } = await api('/users');
+  const inGrp = new Set(grp.members.map((m) => m.serial));
+  const others = users.filter((u) => !inGrp.has(u.serial));
+  $('gSub').textContent = grp.members.length + ' members · tap for details';
+  $('gPanel').innerHTML = `<div class="sec">${grp.members.length} members</div>` +
+    grp.members.map((m) => `<div class="mrow"><div class="avatar" style="width:34px;height:34px;font-size:15px">${initial(m.name)}</div>
+      <div class="grow">${esc(m.name)}${m.serial === me.serial ? ' (you)' : ''}${m.serial === grp.owner ? ' <small>· admin</small>' : ''}<br><small>Serial No. ${m.serial}${m.online ? ' · <span class="on">Online</span>' : ''}</small></div></div>`).join('') +
+    (others.length ? '<div class="sec">Add people</div>' + others.map((u) => `<div class="mrow"><div class="avatar" style="width:34px;height:34px;font-size:15px">${initial(u.name)}</div>
+      <div class="grow">${esc(u.name)}<br><small>Serial No. ${u.serial}</small></div><button class="mini" onclick="addMember('${u.serial}')">Add</button></div>`).join('') : '') +
+    '<button class="danger" onclick="leaveGroup()">Leave group</button>';
+}
+async function addMember(serial) {
+  try {
+    const u = await getUser(serial, true);
+    const key = await wrapKeyFor(grpKey, u.pub);
+    await api('/groups/' + grp.id + '/add', { method: 'POST', body: { serial, key } });
+    toast(u.name + ' added'); await renderPanel();
+  } catch (e) { toast(e.message); }
+}
+async function leaveGroup() {
+  if (!confirm('Leave this group?')) return;
+  try { await api('/groups/' + grp.id + '/leave', { method: 'POST' }); gkCache.delete(grp.id); tab = 'groups'; enterHome(); }
+  catch (e) { toast(e.message); }
+}
+
+/* ---------- start ---------- */
+(async () => {
+  if (token) {
+    try {
+      me = (await api('/me')).user;
+      if (!(await loadMyKeys())) throw new Error('keys missing');
+      return enterHome();
+    } catch (e) { localStorage.clear(); token = null; }
+  }
+  show('v-welcome');
+})();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
